@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>旅</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #0f1020;
+    color: #f5f7ff;
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC","PingFang TC","Hiragino Sans","Microsoft JhengHei",sans-serif;
+  }
+  #gameWrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  #game {
+    border: 1px solid rgba(255,255,255,0.15);
+    background: radial-gradient(1200px 600px at 50% 100%, #1d1f44 0%, #101130 60%, #0f1020 100%);
+    image-rendering: pixelated;
+    width: 960px; height: 540px;
+    max-width: 96vw; max-height: 54vw;
+  }
+  #hud {
+    position: fixed; left: 0; right: 0; top: 10px;
+    display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;
+    pointer-events: none;
+  }
+  .pill {
+    pointer-events: auto;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 8px 12px; border-radius: 999px;
+    font-size: 14px; display: inline-flex; align-items: center; gap: 6px;
+  }
+
+  /* 右上角設定按鈕 */
+  #settingsBtn {
+    position: fixed; right: 14px; top: 14px; z-index: 10;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; padding: 8px 12px; border-radius: 12px;
+    cursor: pointer; font-size: 14px;
+  }
+  #settingsBtn:hover { background: rgba(255,255,255,0.18); }
+
+  .overlay {
+    position: fixed; inset: 0; display: none; place-items: center;
+    background: rgba(6,7,18,0.75); backdrop-filter: blur(3px);
+  }
+  .card {
+    width: min(760px, 92vw);
+    background: #181a3a;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    padding: 18px 18px 14px;
+  }
+  .card h2 { margin: 6px 0 8px; font-size: 22px; }
+  .card p { line-height: 1.75; white-space: pre-wrap; }
+  .btnRow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  button { background: #ffffff10; color: #fff; border: 1px solid #ffffff30;
+    padding: 10px 14px; border-radius: 12px; cursor: pointer; font-size: 14px; }
+  button.primary { background: #7c8aff; border-color: #7c8aff; color: #0f1020; font-weight: 700; }
+  button:disabled { opacity: .6; cursor: not-allowed; }
+  input[type="checkbox"].toggle {
+    appearance: none; width: 36px; height: 22px; position: relative;
+    background: #ffffff22; border: 1px solid #ffffff44; border-radius: 22px; outline: none;
+  }
+  input[type="checkbox"].toggle:checked { background: #7c8aff; border-color: #7c8aff; }
+  input[type="checkbox"].toggle::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+    border-radius: 50%; background: #fff; transition: transform .2s;
+  }
+  input[type="checkbox"].toggle:checked::after { transform: translateX(14px); }
+
+  .grid {
+    display: grid; gap: 10px;
+  }
+  .grid.cols2 { grid-template-columns: 1fr 1fr; }
+  label { font-size: 13px; opacity: .9; }
+  input[type="text"] { width: 100%; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid #ffffff22; background: #0f1028; color: #fff; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  small.muted { opacity: .7; }
+  footer { text-align: center; font-size: 12px; opacity: .6; padding: 8px 0 14px; }
+
+  /* 信件樣式 */
+  #letterBody {
+    font-size: 14px; /* 縮小字體 */
+    max-height: 60vh; /* 最大高度，避免超出螢幕 */
+    overflow-y: auto; /* 若內容太長，可滾動 */
+    margin-bottom: 10px; /* 增加與按鈕的距離 */
+  }
+  
+  /* 傳送門樣式 */
+  #quizTitle {
+    margin-top: 0;
+  }
+</style>
+</head>
+<body>
+  <!-- 修改 HUD 顯示部分 -->
+  <div id="hud">
+    <div class="pill">❤ 生命：<span id="lives">3</span></div>
+    <div class="pill">★ 收集：<span id="gems">0</span></div>
+    <div class="pill">第 <span id="levelNo">1</span> 關：<span id="levelName">不信任</span></div>
+  </div>
+
+  <button id="settingsBtn">⚙️ 設定</button>
+
+  <div id="gameWrap">
+    <canvas id="game" width="960" height="540"></canvas>
+  </div>
+
+  <!-- 開頭故事 -->
+  <div class="overlay" id="introOverlay" aria-modal="true" role="dialog">
+    <div class="card">
+     
+      <p>
+🪶在遙遠的國度中，有一位擁有愛與勇氣的jp
+現在他要穿越重重難關
+去見到它在心裡想了很久的pj
+
+收集星星並透過愛心傳送門去找到pj吧!
+
+✋操作方式：
+← → 移動　
+空白鍵 跳躍（支援連跳！可以在空中再按一次）
+
+      </p>
+      <div class="btnRow">
+        <button id="startBtn" class="primary">開始冒險</button>
+        <button id="openSettingsFromIntro">開啟設定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 設定面板 -->
+  <div class="overlay" id="settingsOverlay" aria-modal="true" role="dialog">
+    <div class="card">
+      <h2>設定</h2>
+      <div class="grid cols2">
+        <div>
+          <h3>如何操作</h3>
+          <p>← → 移動、空白鍵跳躍（支援連跳）。碰到心形傳送門會出現問答，答對才會開啟下一段旅程。</p>
+          <div class="row"><span>♪ 背景音樂</span><input id="bgmToggle" type="checkbox" class="toggle" checked /></div>
+          <div class="row"><span>🔊 音效</span><input id="sfxToggle" type="checkbox" class="toggle" checked /></div>
+        </div>
+        <div>
+          <h3>新增有趣題目</h3>
+          <label>問題：</label>
+          <input id="qText" type="text" placeholder="例如：我們第一次約會去哪？" />
+          <div class="row">
+            <label>選項 A：</label><input id="c1" type="text" placeholder="例如：電影院" style="flex:1" />
+            <label class="row"><input id="c1ok" type="checkbox" /> 正確</label>
+          </div>
+          <div class="row">
+            <label>選項 B：</label><input id="c2" type="text" placeholder="例如：公園" style="flex:1" />
+            <label class="row"><input id="c2ok" type="checkbox" /> 正確</label>
+          </div>
+          <div class="row">
+            <label>選項 C：</label><input id="c3" type="text" placeholder="例如：咖啡廳" style="flex:1" />
+            <label class="row"><input id="c3ok" type="checkbox" /> 正確</label>
+          </div>
+          <div class="btnRow">
+            <button id="addQ">新增題目</button>
+            <button id="resetQs">還原預設題目</button>
+          </div>
+          <small class="muted">目前題數：<span id="qCount">0</span></small>
+        </div>
+      </div>
+      <div class="btnRow" style="justify-content:flex-end">
+        <button id="closeSettings" class="primary">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 問答、信件、結尾 -->
+  <div class="overlay" id="quizOverlay" aria-modal="true" role="dialog">
+    <div class="card">
+      <h3 id="quizTitle">傳送門</h3>
+      <p id="gateMsg" class="muted" style="margin-top:-6px;"></p>
+      <p id="quizQ">訊息文字</p>
+      <div id="quizChoices" class="btnRow"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="letterOverlay" aria-modal="true" role="dialog">
+    <div class="card">
+      <h2>遠方寄來的信</h2>
+      <p id="letterBody"></p>
+      <div class="btnRow">
+        <button id="acceptLetter" class="primary">收入行囊</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="finalOverlay" aria-modal="true" role="dialog">
+    <div class="card">
+      <h2>一起走吧</h2>
+      <p>
+經過了重重困難，終於走到這裡了。<br/>
+接下來的路也是很多困難拉哈哈 
+山路顛簸 未來可期。<br/>
+      </p>
+      <div class="btnRow"><button class="primary" id="restart">再玩一次</button></div>
+    </div>
+  </div>
+
+  <footer>© 給最愛的人的小小冒險</footer>
+
+<script>
+/* ===== 音樂與音效（WebAudio） ===== */
+let audioCtx = null;
+let masterGain, sfxGain, bgmGain;
+let sfxEnabled = true;
+let bgmEnabled = true; // 預設開啟
+const bgmNotes = [
+  [261.63, .35, .05], [329.63, .35, .05], [392.00, .35, .05], [523.25, .55, .15],
+  [392.00, .35, .05], [329.63, .35, .05], [293.66, .35, .05], [349.23, .55, .25],
+];
+let bgmTimer = null;
+function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain(); masterGain.gain.value = 0.8;
+    sfxGain = audioCtx.createGain(); sfxGain.gain.value = 0.9;
+    bgmGain = audioCtx.createGain(); bgmGain.gain.value = 0.25;
+    sfxGain.connect(masterGain); bgmGain.connect(masterGain); masterGain.connect(audioCtx.destination);
+  }
+}
+function playTone({freq=440, type='sine', dur=0.2, attack=0.01, release=0.08, gain=0.6, out=sfxGain, pitchSlide=0}) {
+  if (!sfxEnabled && out===sfxGain) return;
+  ensureAudio();
+  const t0 = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = type; osc.frequency.setValueAtTime(freq, t0);
+  if (pitchSlide) osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq + pitchSlide), t0 + Math.max(0.05, dur-0.02));
+  g.gain.setValueAtTime(0, t0);
+  g.gain.linearRampToValueAtTime(gain, t0 + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + attack + Math.max(0.01, dur - release));
+  osc.connect(g).connect(out);
+  osc.start(t0); osc.stop(t0 + dur + 0.02);
+}
+function playNoise({dur=0.15, attack=0.005, release=0.1, gain=0.4}) {
+  if (!sfxEnabled) return;
+  ensureAudio();
+  const t0 = audioCtx.currentTime;
+  const bufferSize = Math.floor(audioCtx.sampleRate * dur);
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i=0;i<bufferSize;i++) data[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+  const src = audioCtx.createBufferSource(); src.buffer = buffer;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0, t0);
+  g.gain.linearRampToValueAtTime(gain, t0 + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + attack + release);
+  src.connect(g).connect(sfxGain); src.start(t0);
+}
+function startBgm() {
+  if (bgmEnabled && !bgmTimer) {
+    ensureAudio();
+    const schedule = () => {
+      let t = audioCtx.currentTime;
+      for (const [f, d, r] of bgmNotes) {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(f, t);
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.22, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        osc.connect(g).connect(bgmGain);
+        osc.start(t); osc.stop(t + d + 0.02);
+        t += d + r;
+      }
+    };
+    schedule();
+    bgmTimer = setInterval(schedule, 4000);
+  }
+}
+function stopBgm(){ if (bgmTimer) { clearInterval(bgmTimer); bgmTimer = null; } }
+function setBgm(on){ bgmEnabled = on; if (!audioCtx) ensureAudio(); if (bgmEnabled){ audioCtx.resume(); startBgm(); } else { stopBgm(); } }
+function setSfx(on){ sfxEnabled = on; if (audioCtx) audioCtx.resume(); }
+
+/* ===== 遊戲狀態 ===== */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const hudLives = document.getElementById('lives');
+const hudGems = document.getElementById('gems');
+const hudLevelNo = document.getElementById('levelNo');
+const hudLevelName = document.getElementById('levelName'); // 新增關卡名稱元素
+const quizOverlay = document.getElementById('quizOverlay');
+const quizTitle = document.getElementById('quizTitle');
+const gateMsg = document.getElementById('gateMsg');
+const quizQ = document.getElementById('quizQ');
+const quizChoices = document.getElementById('quizChoices');
+const letterOverlay = document.getElementById('letterOverlay');
+const finalOverlay = document.getElementById('finalOverlay');
+const letterBody = document.getElementById('letterBody');
+const acceptLetterBtn = document.getElementById('acceptLetter');
+const restartBtn = document.getElementById('restart');
+const settingsBtn = document.getElementById('settingsBtn');
+const introOverlay = document.getElementById('introOverlay');
+const settingsOverlay = document.getElementById('settingsOverlay');
+const openSettingsFromIntro = document.getElementById('openSettingsFromIntro');
+const closeSettings = document.getElementById('closeSettings');
+const startBtn = document.getElementById('startBtn');
+const bgmToggle = document.getElementById('bgmToggle');
+const sfxToggle = document.getElementById('sfxToggle');
+const qCount = document.getElementById('qCount');
+
+// 新增：記錄已出現的問題索引
+let usedQuestionIndices = [];
+
+// 新增題目相關元素
+const qText = document.getElementById('qText');
+const c1 = document.getElementById('c1'), c2 = document.getElementById('c2'), c3 = document.getElementById('c3');
+const c1ok = document.getElementById('c1ok'), c2ok = document.getElementById('c2ok'), c3ok = document.getElementById('c3ok');
+const addQ = document.getElementById('addQ'), resetQs = document.getElementById('resetQs');
+
+// 題庫（可被重設）
+const DEFAULT_QUESTIONS = [
+  {
+    q: "章魚有幾顆心臟？",
+    choices: [
+      {t:"1", correct:false},
+      {t:"3", correct:true},
+      {t:"5", correct:false},
+    ]
+  },
+  {
+    q: "番茄最早在歐洲被當成什麼？？",
+    choices: [
+      {t:"蔬菜", correct:false},
+      {t:"水果", correct:false},
+      {t:"有毒植物", correct:true},
+    ]
+  },
+  {
+    q: "韓國的「漢江」位於哪座城市？",
+    choices: [
+      {t:"大邱", correct:false},
+      {t:"光州", correct:false},
+      {t:"首爾", correct:true},
+    ]
+    
+  },
+
+  {
+    q: "世界上最早被人類喝的茶來自哪個國家？",
+    choices: [
+      {t:"印度", correct:false},
+      {t:"日本", correct:false},
+      {t:"中國", correct:true},
+
+
+    ]
+    
+  },
+
+  {
+    q: "世界上第一個「網路表情符號 :) 」出現在哪一年？",
+    choices: [
+      {t:"2002", correct:false},
+      {t:"1992", correct:false},
+      {t:"1982", correct:true},
+      
+    ]
+    
+  },
+  {
+    q: "韓國人最常吃的街頭小吃「辣炒年糕」的韓文是？",
+    choices: [
+      {t:"떡볶이", correct:true},
+      {t:"김밥", correct:false},
+      {t:"순대", correct:false},
+
+    ]
+    
+  },
+  {
+    q: "韓國濟州島最有名的水果是？",
+    choices: [
+      {t:"橘子", correct:true},
+      {t:"蘋果", correct:false},
+      {t:"香蕉", correct:false},
+
+    ]
+    
+  },
+
+  {
+    q: "韓國的國花是？",
+    choices: [
+      {t:"木槿花", correct:true},
+      {t:"梅花", correct:false},
+      {t:"玫瑰", correct:false},
+
+    ]
+    
+  },
+
+  {
+    q: "日本的國花是什麼？",
+    choices: [
+      {t:"櫻花", correct:true},
+      {t:"菊花", correct:false},
+      {t:"梅花", correct:false},
+
+    ]
+    
+  },
+   {
+    q: "日本新年的時候，傳統上會吃什麼年菜？",
+    choices: [
+      {t:"壽司", correct:false},
+      {t:"年糕湯", correct:true},
+      {t:"海鮮煎餅", correct:false},
+
+    ]
+    
+  },
+   {
+    q: "日本的鐵路以什麼聞名世界？",
+    choices: [
+      {t:"新幹線", correct:true},
+      {t:"地鐵", correct:false},
+      {t:"普通列車", correct:false},
+
+    ]
+    
+  },
+
+
+  {
+    q: "什麼東西比星星更亮嗎？？",
+    choices: [
+      {t:"打火機", correct:false},
+      {t:"LED", correct:false},
+      {t:"你的笑容", correct:true},
+      
+    ]
+    
+  }
+];
+let QUESTIONS = JSON.parse(JSON.stringify(DEFAULT_QUESTIONS)); // 拷貝
+function refreshQCount(){ qCount.textContent = QUESTIONS.length; }
+refreshQCount();
+
+// 信件全文
+const LETTER_TEXT = `七夕快樂
+想想上個七夕我還不敢躺在你的手上呢哈哈
+
+先道歉一下
+因為自己來沒調整好，有時候對事情過多的情緒、偏激動的訊息。
+以及膽怯想像中他人目光的投射，進行的批判和奇怪的要求。
+
+接下來
+想說的讚美的平常都講了拉
+謝謝你總是很有能量的對我好
+雖然我毛很多 還是有東西能發難
+然後我對我自己也覺得有很多問題
+但你都包容下來了
+在我問有沒有問題的時候都說沒關係
+本來都想好被罵和聽到有趣東西的心都落空了呢
+反正你都不知道為什麼吸收了拉
+厲害
+
+最後
+祝我們能各自越來越好
+加再一起更好!
+
+あなたのような
+Je t'aime
+사랑해
+`;
+
+// 關卡資料
+const LEVELS = [
+  {
+    platforms: [
+      {x:0,y:500,w:960,h:40},
+      {x:180,y:440,w:120,h:16},
+      {x:360,y:390,w:140,h:16},
+      {x:560,y:350,w:120,h:16},
+      {x:760,y:310,w:140,h:16},
+    ],
+    spikes: [
+      {x:80,y:484,w:60,h:16},
+      {x:300,y:374,w:40,h:16}
+    ],
+    gems: [
+      {x:200,y:410,got:false},
+      {x:580,y:320,got:false}
+    ],
+    gate: {x:900,y:470,w:40,h:30, quizIndex:0}
+  },
+  {
+    platforms: [
+      {x:0,y:500,w:960,h:40},
+      {x:120,y:460,w:120,h:16},
+      {x:300,y:420,w:120,h:16},
+      {x:480,y:380,w:120,h:16},
+      {x:660,y:340,w:120,h:16},
+      {x:820,y:300,w:100,h:16}
+    ],
+    spikes: [
+      {x:230,y:444,w:50,h:16},
+      {x:410,y:404,w:50,h:16},
+      {x:590,y:364,w:50,h:16},
+    ],
+    gems: [
+      {x:140,y:430,got:false},
+      {x:500,y:350,got:false},
+      {x:840,y:270,got:false}
+    ],
+    gate: {x:900,y:270,w:40,h:30, quizIndex:1}
+  },
+  {
+    platforms: [
+      {x:0,y:500,w:960,h:40},
+      {x:180,y:460,w:160,h:16},
+      {x:420,y:420,w:160,h:16},
+      {x:660,y:380,w:160,h:16},
+      {x:820,y:340,w:120,h:16}
+    ],
+    spikes: [
+      {x:320,y:404,w:60,h:16},
+      {x:560,y:364,w:60,h:16}
+    ],
+    gems: [
+      {x:200,y:430,got:false},
+      {x:440,y:390,got:false},
+      {x:680,y:350,got:false}
+    ],
+    goal: {x:900,y:300,w:40,h:70}
+  }
+];
+
+// 幾何小生物（改為小貓：圓身 + 貓耳 + 鬍鬚 + 眼睛鼻子 + 手腳）
+const player = {
+  x: 40, y: 460, vx: 0, vy: 0,
+  w: 30, h: 30,
+  onGround: false,
+  lives: 2,  // 從3改為2
+  gems: 0,
+  facing: 1,
+  hasBackpack: false,
+  jumpsLeft: 2
+};
+const MAX_JUMPS = 2;
+
+// 其他狀態
+let levelIndex = 0;
+let playing = false; // 開場先暫停，等按「開始冒險」
+let keys = new Set();
+let gateLocked = false;
+let letterShown = false;
+let metPartner = false;
+
+// 問答模式（傳送門 or 復活）
+let quizMode = "gate"; // "gate" | "revive"
+let reviveCursor = 0;
+const REVIVE_HP = 1;
+
+// 傳送門提示訊息
+const GATE_MESSAGES = {
+  0: "歐麥尬，你成功了！你用運用了你的真誠和熱情 挺過了名為{不信任}的關卡。",
+  1: "歐麥尬，你是天才吧！你運用了神奇力量，挺過了名為{情緒化反應}的關卡。",
+};
+
+// 修改關卡顯示名稱，為每一關添加主題名稱
+const LEVEL_NAMES = ["不信任", "情緒化反應", "磨合"];
+
+/* ===== 幾何運算 ===== */
+function rectsIntersect(a,b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+/* ===== 繪製 ===== */
+function drawLevel(level) {
+  ctx.fillStyle = '#39408d';
+  level.platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+  level.spikes.forEach(s => drawSpike(s));
+  level.gems.forEach(g => { if (!g.got) drawGem(g.x,g.y); });
+  if (level.gate) drawGate(level.gate);
+  if (level.goal) drawGoal(level.goal);
+}
+function drawSpike(s) {
+  ctx.fillStyle = '#ef476f';
+  ctx.beginPath();
+  ctx.moveTo(s.x, s.y + s.h);
+  ctx.lineTo(s.x + s.w/2, s.y);
+  ctx.lineTo(s.x + s.w, s.y + s.h);
+  ctx.closePath();
+  ctx.fill();
+}
+// 完整五角星（用於收集物與背景）
+function pathStar(cx, cy, outerR = 12, innerR = 5, points = 5) {
+  const step = Math.PI / points;
+  ctx.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const r = (i % 2 === 0) ? outerR : innerR;
+    const a = -Math.PI / 2 + i * step;
+    const x = cx + Math.cos(a) * r;
+    const y = cy + Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+function drawGem(x,y) {
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(Math.sin(Date.now()/300)*0.15);
+  ctx.fillStyle = '#ffd166';
+  pathStar(0,0,10,4.5,5);
+  ctx.fill();
+  ctx.restore();
+}
+function drawGate(g) {
+  const cx = g.x + g.w/2, cy = g.y + g.h/2;
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(1.1,1.1);
+  ctx.fillStyle = '#e46dbc'; heartPath(0,0,18); ctx.fill();
+  ctx.restore();
+}
+// 目標（把方形小生物改為狗狗）
+function drawGoal(goal) {
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(goal.x-20, goal.y-20, goal.w+40, goal.h+40);
+
+  const x = goal.x, y = goal.y, w = goal.w;
+  ctx.save();
+  ctx.translate(x + w/2, y + w/2);
+
+  // 身體（圓角方塊）
+  const bodyW = w, bodyH = w*0.9, r = 8;
+  ctx.fillStyle = '#7bdff2';
+  roundedRect(-bodyW/2, -bodyH/2, bodyW, bodyH, r);
+  ctx.fill();
+
+  // 耳朵（狗狗耳：左右小下垂）
+  ctx.fillStyle = '#59cbe8';
+  ctx.beginPath();
+  ctx.ellipse(-bodyW*0.35, -bodyH*0.55, 8, 12, 0, 0, Math.PI*2);
+  ctx.ellipse(bodyW*0.35, -bodyH*0.55, 8, 12, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // 眼睛
+  ctx.fillStyle = '#0b0e2a';
+  ctx.fillRect(-10, -2, 6, 6);
+  ctx.fillRect(4, -2, 6, 6);
+
+  // 鼻口（小圓鼻 + 嘴）
+  ctx.fillStyle = '#0b0e2a';
+  ctx.beginPath(); ctx.arc(0, 6, 3, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(0, 9); ctx.lineTo(-3, 12); ctx.lineTo(3, 12); ctx.closePath(); ctx.fill();
+
+  // 愛心效果
+  ctx.globalAlpha = 0.5;
+  ctx.translate(0, -bodyH/2 - 14);
+  ctx.fillStyle = '#f15bb5'; heartPath(0,0,26); ctx.fill();
+  ctx.restore();
+}
+function roundedRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+function heartPath(x,y,r) {
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.bezierCurveTo(x - r, y - r, x - r*1.6, y + r*0.6, x, y + r*1.6);
+  ctx.bezierCurveTo(x + r*1.6, y + r*0.6, x + r, y - r, x, y);
+}
+// 玩家（小貓）
+function drawPlayer() {
+  const p = player;
+  const t = Date.now()*0.006 + Math.abs(p.vx)*2;
+  ctx.save();
+  ctx.translate(p.x + p.w/2, p.y + p.h/2);
+
+  // 身體（圓）
+  ctx.fillStyle = '#80ffdb';
+  ctx.beginPath(); ctx.arc(0,0,p.w/2,0,Math.PI*2); ctx.fill();
+
+  // 貓耳
+  ctx.fillStyle = '#59f1dd';
+  ctx.beginPath();
+  ctx.moveTo(-8, -10); ctx.lineTo(-2, -18); ctx.lineTo(4, -10); ctx.closePath(); // 左耳
+  ctx.moveTo(8, -10); ctx.lineTo(2, -18); ctx.lineTo(-4, -10); ctx.closePath();  // 右耳
+  ctx.fill();
+
+  // 添加腳的擺動
+  const swing = Math.sin(t) * 4;
+  ctx.strokeStyle = '#0b0e2a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath();
+  // 只畫腳
+  ctx.moveTo(-6, 12); ctx.lineTo(-6 + swing*0.2, 16);
+  ctx.moveTo(6, 12); ctx.lineTo(6 - swing*0.2, 16);
+  ctx.stroke();
+
+  // 眼睛
+  ctx.fillStyle = '#0b0e2a';
+  const eyeX = p.facing >= 0 ? 5 : -5;
+  ctx.beginPath(); ctx.arc(eyeX-3, -2, 2.6, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(eyeX+3, -2, 2.6, 0, Math.PI*2); ctx.fill();
+
+  // 鼻子（三角）- 移除了鬍鬚
+  ctx.fillStyle = '#0b0e2a';
+  ctx.beginPath();
+  ctx.moveTo(0, 1);
+  ctx.lineTo(-2, 4);
+  ctx.lineTo(2, 4);
+  ctx.closePath();
+  ctx.fill();
+
+  // 背包（看信後）
+  if (p.hasBackpack) { ctx.fillStyle = '#9bf6ff'; ctx.fillRect(-p.w/2 - 6, -8, 8, 16); }
+
+  ctx.restore();
+}
+
+/* ===== 物理與更新 ===== */
+const GRAVITY = 0.6;
+const JUMP_V = -10.5;
+const MOVE_A = 0.8;
+const FRICTION = 0.75;
+const MAX_VX = 5.0;
+const MAX_VY = 14;
+
+function resetPlayer(spawnX=40, spawnY=460) {
+  player.x = spawnX; player.y = spawnY;
+  player.vx = 0; player.vy = 0; player.onGround = false;
+  player.jumpsLeft = MAX_JUMPS;
+}
+function collidePlatformsHoriz(p, plats) {
+  for (const pl of plats) {
+    const a = {x:p.x, y:p.y, w:p.w, h:p.h};
+    if (rectsIntersect(a, pl)) {
+      if (p.vx > 0) p.x = pl.x - p.w;
+      if (p.vx < 0) p.x = pl.x + pl.w;
+      p.vx = 0;
+    }
+  }
+}
+function collidePlatformsVert(p, plats) {
+  for (const pl of plats) {
+    const a = {x:p.x, y:p.y, w:p.w, h:p.h};
+    if (rectsIntersect(a, pl)) {
+      if (p.vy > 0) { // 往下落到平台
+        p.y = pl.y - p.h; p.vy = 0; p.onGround = true; p.jumpsLeft = MAX_JUMPS;
+      } else if (p.vy < 0) { // 往上撞到平台
+        p.y = pl.y + pl.h; p.vy = 0;
+      }
+    }
+  }
+}
+function update() {
+  if (!playing) return;
+  const lvl = LEVELS[levelIndex];
+
+  if (keys.has('ArrowLeft')) { player.vx -= MOVE_A; player.facing = -1; }
+  if (keys.has('ArrowRight')) { player.vx += MOVE_A; player.facing = 1; }
+  player.vx *= FRICTION; player.vx = Math.max(-MAX_VX, Math.min(MAX_VX, player.vx));
+
+  player.vy += GRAVITY; player.vy = Math.min(player.vy, MAX_VY);
+
+  player.x += player.vx; collidePlatformsHoriz(player, lvl.platforms);
+  player.y += player.vy; player.onGround = false; collidePlatformsVert(player, lvl.platforms);
+
+  // 撿星星
+  lvl.gems.forEach(g => {
+    const box = {x:g.x-6,y:g.y-10,w:24,h:24};
+    if (!g.got && rectsIntersect(player, box)) {
+      g.got = true; player.gems++; hudGems.textContent = player.gems; playGem();
+    }
+  });
+
+  // 尖刺
+  lvl.spikes.forEach(s => {
+    const box = {x:s.x, y:s.y, w:s.w, h:s.h};
+    if (rectsIntersect(player, box)) { playHurt(); dieAndMaybeRevive(); }
+  });
+
+  // 傳送門
+  if (lvl.gate && !gateLocked) {
+    const box = {x:lvl.gate.x-8,y:lvl.gate.y-8,w:lvl.gate.w+16,h:lvl.gate.h+16};
+    if (rectsIntersect(player, box)) {
+      // 檢查玩家是否收集了該關卡中的所有星星
+      const totalStars = lvl.gems.length;
+      const collectedStars = lvl.gems.filter(g => g.got).length;
+      
+      if (collectedStars < totalStars) {
+        // 未收集足夠星星，顯示提示訊息
+        playWrong(); // 播放錯誤音效
+        openInsufficientStarsMsg();
+      } else {
+        // 收集足夠星星，正常開啟傳送門
+        playPortal();
+        openQuiz(lvl.gate.quizIndex, "gate");
+      }
+    }
+  }
+
+  // 終點與信件
+  if (lvl.goal) {
+    const box = {x:lvl.goal.x-8,y:lvl.goal.y-8,w:lvl.goal.w+16,h:lvl.goal.h+16};
+    if (rectsIntersect(player, box) && !letterShown) { metPartner = true; playSoftChime(); openLetter(); }
+    else if (rectsIntersect(player, box) && letterShown && player.hasBackpack) { playing = false; finalOverlay.style.display = 'grid'; playLevelClear(); }
+  }
+}
+function render() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawStars();
+  drawLevel(LEVELS[levelIndex]);
+  drawPlayer();
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.font = '16px "Noto Sans TC", sans-serif';
+  if (metPartner && levelIndex === 2) {
+    ctx.fillText('遇見了另一個幾何小生物（狗狗）。', 24, 30);
+    ctx.fillText('「經過了重重困難，終於走到這裡了。」', 24, 52);
+    ctx.fillText('走近一點，打開那封從遠方寄來的信……', 24, 74);
+  }
+}
+// 背景星空（完整星形）
+function drawStars() {
+  const t = Date.now()*0.00015;
+  for (let i=0;i<90;i++) {
+    const x = (i*123.456 + t*800) % canvas.width;
+    const y = (i*67.89 + Math.sin(i+t)*30 + 100) % canvas.height;
+    ctx.save();
+    ctx.globalAlpha = ((i%7)/12)+0.25;
+    ctx.fillStyle = '#c4c9ff';
+    pathStar(x, y, 3.3, 1.5, 5);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+function loop(){ update(); render(); requestAnimationFrame(loop); }
+
+/* ===== 問答流程 ===== */
+function openQuiz(index, mode="gate") {
+  quizMode = mode;
+  gateLocked = true; playing = false;
+  
+  // 修改：如果是復活模式，選擇一個未使用過的問題
+  if (mode === "revive") {
+    // 如果所有問題都已用完，重置已使用的問題記錄
+    if (usedQuestionIndices.length >= QUESTIONS.length) {
+      usedQuestionIndices = [];
+    }
+    
+    // 尋找一個未使用過的問題索引
+    let newIndex;
+    do {
+      newIndex = Math.floor(Math.random() * QUESTIONS.length);
+    } while (usedQuestionIndices.includes(newIndex) && usedQuestionIndices.length < QUESTIONS.length);
+    
+    // 記錄這個問題已被使用
+    usedQuestionIndices.push(newIndex);
+    index = newIndex;
+  }
+  
+  const Q = QUESTIONS[(index ?? 0) % QUESTIONS.length];
+  
+  if (mode === "gate") {
+    // 改為顯示訊息而非問題
+    quizTitle.textContent = "傳送門";
+    quizQ.textContent = "";
+    gateMsg.textContent = (index in GATE_MESSAGES) ? GATE_MESSAGES[index] : "加油，繼續前進！";
+    quizChoices.innerHTML = '';
+    
+    // 只提供一個繼續按鈕
+    const b = document.createElement('button');
+    b.textContent = "繼續前進";
+    b.className = "primary";
+    b.addEventListener('click', () => {
+      playCorrect();
+      closeQuiz(true, index);
+    });
+    quizChoices.appendChild(b);
+  } else {
+    // 復活模式保持問答形式
+    quizTitle.textContent = "😈復活問答";
+    gateMsg.textContent = "";
+    quizQ.textContent = Q.q;
+    quizChoices.innerHTML = '';
+    Q.choices.forEach((c) => {
+      const b = document.createElement('button'); 
+      b.textContent = c.t;
+      b.addEventListener('click', () => {
+        if (c.correct) {
+          playCorrect(); 
+          closeQuiz(true, index);
+        } else {
+          playWrong();
+          // 換下一題，確保不重複
+          openQuiz(null, "revive");
+        }
+      });
+      quizChoices.appendChild(b);
+    });
+  }
+  
+  quizOverlay.style.display = 'grid';
+}
+function closeQuiz(success, index) {
+  quizOverlay.style.display = 'none';
+  if (success) {
+    if (quizMode === "gate") {
+      levelIndex++; if (levelIndex >= LEVELS.length) levelIndex = LEVELS.length-1;
+      hudLevelNo.textContent = levelIndex + 1; 
+      hudLevelName.textContent = LEVEL_NAMES[levelIndex]; // 更新關卡名稱
+      resetPlayer();
+    } else if (quizMode === "revive") {
+      // 復活成功：補滿指定血量並重生
+      player.lives = Math.max(player.lives, REVIVE_HP);
+      hudLives.textContent = player.lives;
+      resetPlayer();
+    }
+  }
+  playing = true; gateLocked = false;
+}
+
+/* ===== 信件流程 ===== */
+function openLetter() {
+  playing = false; letterShown = true;
+  letterBody.textContent = LETTER_TEXT; letterOverlay.style.display = 'grid';
+}
+acceptLetterBtn.addEventListener('click', () => {
+  letterOverlay.style.display = 'none'; playing = true; player.hasBackpack = true; playPowerUp();
+});
+
+/* ===== 生命/重生（含復活問答） ===== */
+function dieAndMaybeRevive() {
+  player.lives--; hudLives.textContent = player.lives;
+  if (player.lives <= 0) {
+    // 啟動復活問答（不重置星星收集與關卡）
+    // 不再指定初始問題索引，而是讓 openQuiz 函數選擇未使用的問題
+    openQuiz(null, "revive");
+    return;
+  }
+  resetPlayer();
+}
+
+/* ===== 輸入處理（包含連跳） ===== */
+document.addEventListener('keydown', (e) => {
+  if (!audioCtx) ensureAudio(); // 行動裝置需互動啟用音訊
+  if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') keys.add(e.code);
+  if (e.code === 'Space') {
+    if (player.jumpsLeft > 0) {
+      player.vy = JUMP_V; player.onGround = false; player.jumpsLeft--;
+      playJump();
+    }
+  }
+  if (['ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+});
+document.addEventListener('keyup', (e) => { keys.delete(e.code); });
+
+/* ===== 設定面板行為 ===== */
+settingsBtn.addEventListener('click', () => { settingsOverlay.style.display = 'grid'; });
+openSettingsFromIntro.addEventListener('click', () => { settingsOverlay.style.display = 'grid'; });
+closeSettings.addEventListener('click', () => { settingsOverlay.style.display = 'none'; });
+bgmToggle.addEventListener('change', e => setBgm(e.target.checked));
+sfxToggle.addEventListener('change', e => setSfx(e.target.checked));
+addQ.addEventListener('click', () => {
+  const text = qText.value.trim();
+  const A = c1.value.trim(), B = c2.value.trim(), C = c3.value.trim();
+  const aok = c1ok.checked, bok = c2ok.checked, cok = c3ok.checked;
+  if (!text || !(A||B||C) || !(aok||bok||cok)) {
+    alert('請輸入完整題目，並至少勾選一個正確答案。'); return;
+  }
+  const choices = [];
+  if (A) choices.push({t:A, correct:aok});
+  if (B) choices.push({t:B, correct:bok});
+  if (C) choices.push({t:C, correct:cok});
+  QUESTIONS.push({q:text, choices});
+  qText.value = c1.value = c2.value = c3.value = '';
+  c1ok.checked = c2ok.checked = c3ok.checked = false;
+  refreshQCount();
+  alert('已新增題目！');
+});
+resetQs.addEventListener('click', () => {
+  if (confirm('確定要還原預設題目嗎？')) {
+    QUESTIONS = JSON.parse(JSON.stringify(DEFAULT_QUESTIONS));
+    refreshQCount();
+  }
+});
+
+/* ===== 音效樣式 ===== */
+function playJump(){ playTone({freq:520, type:'triangle', dur:0.18, pitchSlide:120, gain:0.35}); }
+function playGem(){ const base = 880; playTone({freq:base, type:'sine', dur:0.09, gain:0.35}); setTimeout(()=>playTone({freq:base*1.25, type:'sine', dur:0.09, gain:0.32}), 80); setTimeout(()=>playTone({freq:base*1.5, type:'sine', dur:0.12, gain:0.28}), 160); }
+function playHurt(){ playNoise({dur:0.2, gain:0.35}); }
+function playCorrect(){ playTone({freq:660, type:'sine', dur:0.12, gain:0.28}); setTimeout(()=>playTone({freq:880, type:'sine', dur:0.12, gain:0.28}), 120); }
+function playWrong(){ playTone({freq:220, type:'sawtooth', dur:0.18, gain:0.22}); setTimeout(()=>playTone({freq:196, type:'sawtooth', dur:0.2, gain:0.22}), 120); }
+function playPortal(){ playTone({freq:520, type:'square', dur:0.25, gain:0.25, pitchSlide:-200}); }
+function playSoftChime(){ playTone({freq:523.25, type:'sine', dur:0.25, gain:0.22}); setTimeout(()=>playTone({freq:659.25, type:'sine', dur:0.35, gain:0.22}), 200); }
+function playPowerUp(){ playTone({freq:392, type:'square', dur:0.12, gain:0.28}); setTimeout(()=>playTone({freq:523.25, type:'square', dur:0.12, gain:0.28}), 100); setTimeout(()=>playTone({freq:659.25, type:'square', dur:0.16, gain:0.28}), 200); }
+function playLevelClear(){ playTone({freq:523.25, type:'triangle', dur:0.18, gain:0.28}); setTimeout(()=>playTone({freq:659.25, type:'triangle', dur:0.18, gain:0.28}), 160); setTimeout(()=>playTone({freq:783.99, type:'triangle', dur:0.22, gain:0.28}), 320); }
+
+/* ===== 重開機制：再玩一次 => 回首頁 ===== */
+restartBtn.addEventListener('click', () => {
+  finalOverlay.style.display = 'none';
+  // 重置狀態
+  levelIndex = 0;
+  hudLevelNo.textContent = 1;
+  hudLevelName.textContent = LEVEL_NAMES[0]; // 重置為第一關名稱
+  player.lives = 2; hudLives.textContent = 2;  // 從3改為2
+  player.gems = 0; hudGems.textContent = 0;
+  player.hasBackpack = false;
+  letterShown = false; metPartner = false;
+  // 重置關卡星星
+  LEVELS.forEach(lvl => lvl.gems.forEach(g => g.got = false));
+  // 重置已使用的問題記錄
+  usedQuestionIndices = [];
+  resetPlayer();
+  playing = false;
+  introOverlay.style.display = 'grid'; // 回到首頁（開頭故事）
+});
+
+/* ===== 啟動 ===== */
+function fullResetForIntro() {
+  resetPlayer();
+  player.lives = 2;  // 確保初始化時也是2條命
+  hudLives.textContent = 2;  // 更新UI顯示
+  hudLevelName.textContent = LEVEL_NAMES[0]; // 初始化時顯示第一關名稱
+  playing = false;
+  introOverlay.style.display = 'grid';
+}
+fullResetForIntro();
+loop();
+
+// 開場顯示故事 & 預先設定切換狀態
+bgmToggle.checked = true; sfxToggle.checked = true;
+
+startBtn.addEventListener('click', () => {
+  introOverlay.style.display = 'none';
+  playing = true;
+  setBgm(true); // 使用者互動後啟動 BGM
+});
+
+// 修改顯示星星不足訊息的函數
+function openInsufficientStarsMsg() {
+  gateLocked = true; playing = false;
+  
+  quizTitle.textContent = "星星不足";
+  quizQ.textContent = "唉呦！你的行囊裡好像缺少足夠的星星前往下一關呢";
+  gateMsg.textContent = "試著收集本關所有的星星吧！";
+  quizChoices.innerHTML = '';
+  
+  // 提供一個繼續按鈕
+  const b = document.createElement('button');
+  b.textContent = "我再去找找";
+  b.className = "primary";
+  b.addEventListener('click', () => {
+    quizOverlay.style.display = 'none';
+    // 將玩家重置到關卡起點
+    resetPlayer();
+    playing = true;
+    gateLocked = false;
+  });
+  quizChoices.appendChild(b);
+  
+  quizOverlay.style.display = 'grid';
+}
+</script>
+</body>
+</html>
+
